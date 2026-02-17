@@ -1,0 +1,37 @@
+name: Trends
+options:
+  bundleIdPrefix: com.trends
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "16.0"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+
+targets:
+  Trends:
+    type: application
+    platform: iOS
+    sources:
+      - path: Trends
+        excludes:
+          - "**/.DS_Store"
+    settings:
+      base:
+        INFOPLIST_FILE: Trends/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Trends/Trends.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.ciaranashton.trends
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    entitlements:
+      path: Trends/Trends.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.access: []
