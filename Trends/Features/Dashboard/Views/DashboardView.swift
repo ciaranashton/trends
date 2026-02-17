@@ -5,16 +5,11 @@ struct DashboardView: View {
     let scoreEngine: ScoreEngine
     @State private var viewModel: DashboardViewModel?
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
-
     var body: some View {
         NavigationStack {
             ScrollView {
                 if let viewModel, !viewModel.isLoading {
-                    LazyVStack(alignment: .leading, spacing: 24) {
+                    LazyVStack(alignment: .leading, spacing: 20) {
                         // Score cards section
                         VStack(alignment: .leading, spacing: 12) {
                             HStack(spacing: 6) {
@@ -29,25 +24,15 @@ struct DashboardView: View {
                             ScoresSectionView(scoreEngine: scoreEngine)
                         }
 
+                        // Metric categories as unified cards
                         ForEach(HealthMetricCategory.allCases, id: \.self) { category in
                             let categorySummaries = viewModel.summaries(for: category)
                             if !categorySummaries.isEmpty {
-                                Section {
-                                    LazyVGrid(columns: columns, spacing: 12) {
-                                        ForEach(categorySummaries) { summary in
-                                            NavigationLink(value: summary.metric) {
-                                                MetricCardView(summary: summary)
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-                                    }
-                                } header: {
-                                    Text(category.rawValue)
-                                        .font(.title3.weight(.semibold))
-                                        .foregroundStyle(.primary)
-                                }
+                                categoryCard(category: category, summaries: categorySummaries)
                             }
                         }
+
+                        Spacer(minLength: 16)
                     }
                     .padding(.horizontal)
                     .padding(.top, 8)
@@ -61,7 +46,7 @@ struct DashboardView: View {
                     .frame(maxWidth: .infinity, minHeight: 300)
                 }
             }
-            .navigationTitle("Dashboard")
+            .navigationTitle(dateTitle)
             .navigationDestination(for: HealthMetric.self) { metric in
                 MetricDetailView(metric: metric, healthManager: healthManager)
             }
@@ -84,6 +69,93 @@ struct DashboardView: View {
                 }
                 await scoreEngine.computeScores()
             }
+        }
+    }
+
+    // MARK: - Date Title
+
+    private var dateTitle: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMM d"
+        return formatter.string(from: Date())
+    }
+
+    // MARK: - Category Card
+
+    private func categoryCard(category: HealthMetricCategory, summaries: [MetricSummary]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Category header
+            HStack(spacing: 8) {
+                Image(systemName: categoryIcon(category))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(categoryColor(category))
+                    .frame(width: 24, height: 24)
+                    .background(categoryColor(category).opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+                Text(category.rawValue)
+                    .font(.subheadline.weight(.semibold))
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.quaternary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 8)
+
+            // Metric rows
+            ForEach(Array(summaries.enumerated()), id: \.element.id) { index, summary in
+                NavigationLink(value: summary.metric) {
+                    MetricCardView(summary: summary)
+                }
+                .buttonStyle(.plain)
+
+                if index < summaries.count - 1 {
+                    Divider()
+                        .padding(.leading, 36)
+                        .padding(.trailing, 14)
+                }
+            }
+
+            Spacer().frame(height: 6)
+        }
+        .background {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [categoryColor(category).opacity(0.03), .clear],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(.secondary.opacity(0.08), lineWidth: 0.5)
+                )
+        }
+    }
+
+    // MARK: - Category Helpers
+
+    private func categoryIcon(_ category: HealthMetricCategory) -> String {
+        switch category {
+        case .activityAndFitness: return "figure.run"
+        case .bodyMeasurements: return "scalemass.fill"
+        case .vitalsAndSleep: return "heart.fill"
+        }
+    }
+
+    private func categoryColor(_ category: HealthMetricCategory) -> Color {
+        switch category {
+        case .activityAndFitness: return .green
+        case .bodyMeasurements: return .purple
+        case .vitalsAndSleep: return .red
         }
     }
 

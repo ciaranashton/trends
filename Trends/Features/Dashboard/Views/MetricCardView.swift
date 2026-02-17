@@ -1,97 +1,81 @@
 import SwiftUI
 
+/// Compact label row on top, full-width sparkline underneath — all charts align.
 struct MetricCardView: View {
     let summary: MetricSummary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Top: icon + trend
-            HStack(alignment: .center) {
-                Image(systemName: summary.metric.systemImage)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(summary.metric.accentColor)
-                    .frame(width: 28, height: 28)
-                    .background(summary.metric.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        VStack(spacing: 6) {
+            // Top row: dot + name | value + trend
+            HStack(spacing: 0) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(summary.metric.accentColor)
+                        .frame(width: 6, height: 6)
 
-                Spacer()
+                    Text(summary.metric.displayName)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
 
-                // Trend badge
-                if let trendText = summary.formattedTrend {
-                    let isPositive = (summary.trend ?? 0) > 0
-                    let trendColor = trendColorForMetric(isPositive: isPositive)
+                Spacer(minLength: 8)
 
-                    HStack(spacing: 2) {
-                        Image(systemName: summary.trendDirection.icon)
-                            .font(.system(size: 8, weight: .bold))
-                        Text(trendText)
-                            .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                HStack(spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text(summary.formattedValue)
+                            .font(.system(size: 15, weight: .semibold, design: .rounded).monospacedDigit())
+                            .foregroundStyle(.primary)
+
+                        if summary.hasData && !summary.metric.unitLabel.isEmpty {
+                            Text(summary.metric.unitLabel)
+                                .font(.system(size: 9))
+                                .foregroundStyle(.tertiary)
+                        }
                     }
-                    .foregroundStyle(trendColor)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(trendColor.opacity(0.12), in: Capsule())
+
+                    if let trendText = summary.formattedTrend {
+                        let isPositive = (summary.trend ?? 0) > 0
+                        let trendColor = trendColorForMetric(isPositive: isPositive)
+
+                        HStack(spacing: 2) {
+                            Image(systemName: summary.trendDirection.icon)
+                                .font(.system(size: 6, weight: .bold))
+                            Text(trendText)
+                                .font(.system(size: 9, weight: .semibold).monospacedDigit())
+                        }
+                        .foregroundStyle(trendColor)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 3)
+                        .background(trendColor.opacity(0.12), in: Capsule())
+                    }
                 }
             }
 
-            Spacer(minLength: 4)
-
-            // Sparkline
+            // Full-width sparkline underneath
             if summary.sparkline.count >= 2 {
                 SparklineView(
                     data: summary.sparkline,
                     color: summary.metric.accentColor,
                     lineWidth: 1.5
                 )
-                .frame(height: 32)
-                .padding(.trailing, 4)
+                .frame(height: 30)
             } else {
-                Spacer()
-                    .frame(height: 32)
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(.secondary.opacity(0.04))
+                    .frame(height: 30)
+                    .overlay {
+                        Text("No data yet")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.quaternary)
+                    }
             }
-
-            Spacer(minLength: 6)
-
-            // Bottom: value + label
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(summary.formattedValue)
-                    .font(.title3.weight(.bold).monospacedDigit())
-                    .foregroundStyle(.primary)
-
-                if summary.hasData && !summary.metric.unitLabel.isEmpty {
-                    Text(summary.metric.unitLabel)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-
-            Text(summary.metric.displayName)
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 130, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [summary.metric.accentColor.opacity(0.04), .clear],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(summary.metric.accentColor.opacity(0.08), lineWidth: 0.5)
-                )
-        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 14)
+        .contentShape(Rectangle())
     }
 
-    /// For most metrics "up" is good (steps, energy), but for some "down" is good (resting HR, body fat)
     private func trendColorForMetric(isPositive: Bool) -> Color {
         let lowerIsBetter: Set<HealthMetric> = [.restingHeartRate, .bmi, .bodyFatPercentage, .weight, .respiratoryRate]
         let inverted = lowerIsBetter.contains(summary.metric)
