@@ -19,7 +19,7 @@ final class DashboardViewModel {
         summaries = await withTaskGroup(of: MetricSummary.self) { group in
             for metric in metrics {
                 group.addTask {
-                    await self.healthManager.todaySummary(for: metric)
+                    await self.loadSummaryWithSparkline(for: metric)
                 }
             }
 
@@ -39,6 +39,34 @@ final class DashboardViewModel {
         }
 
         isLoading = false
+    }
+
+    private func loadSummaryWithSparkline(for metric: HealthMetric) async -> MetricSummary {
+        // Fetch today's value and 7-day history concurrently
+        async let todayResult = healthManager.todaySummary(for: metric)
+        async let weekData = healthManager.timeSeries(for: metric, range: .week)
+
+        let today = await todayResult
+        let history = await weekData
+
+        let sparklineValues = history.suffix(7).map(\.value)
+
+        // Calculate trend: today vs 7-day average
+        var trend: Double? = nil
+        if let todayValue = today.value, !history.isEmpty {
+            let avg = history.map(\.value).reduce(0, +) / Double(history.count)
+            if avg > 0 {
+                trend = ((todayValue - avg) / avg) * 100
+            }
+        }
+
+        return MetricSummary(
+            metric: metric,
+            value: today.value,
+            date: today.date,
+            sparkline: sparklineValues,
+            trend: trend
+        )
     }
 
     func summaries(for category: HealthMetricCategory) -> [MetricSummary] {

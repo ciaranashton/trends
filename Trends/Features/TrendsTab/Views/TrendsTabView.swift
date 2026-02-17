@@ -13,7 +13,9 @@ struct TrendsTabView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Time range picker
+                    // Summary header with mini gauges
+                    summaryHeader
+
                     Picker("Time Range", selection: $selectedRange) {
                         ForEach([TimeRange.week, .month, .threeMonths], id: \.self) { range in
                             Text(range.displayName).tag(range)
@@ -48,6 +50,58 @@ struct TrendsTabView: View {
         }
     }
 
+    // MARK: - Summary Header
+
+    private var summaryHeader: some View {
+        HStack(spacing: 0) {
+            summaryGauge(type: .sleep, result: scoreEngine.sleepScore)
+            summaryDivider
+            summaryGauge(type: .recovery, result: scoreEngine.recoveryScore)
+            summaryDivider
+            summaryGauge(type: .effort, result: scoreEngine.effortScore)
+        }
+        .padding(.vertical, 16)
+        .background {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(.secondary.opacity(0.08), lineWidth: 0.5)
+                )
+        }
+        .padding(.horizontal)
+    }
+
+    private var summaryDivider: some View {
+        Rectangle()
+            .fill(.secondary.opacity(0.12))
+            .frame(width: 0.5, height: 50)
+    }
+
+    private func summaryGauge(type: ScoreType, result: ScoreResult?) -> some View {
+        VStack(spacing: 6) {
+            ZStack {
+                ScoreGaugeView(
+                    value: result?.value ?? 0,
+                    maxValue: type.maxValue,
+                    color: result?.color ?? .secondary,
+                    lineWidth: 4
+                )
+
+                Text(result?.formattedValue ?? "--")
+                    .font(.system(size: 13, weight: .bold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(result != nil ? .primary : .secondary)
+                    .offset(y: -1)
+            }
+            .frame(width: 38, height: 38)
+
+            Text(type.displayName)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
     // MARK: - Trend Card
 
     private func trendCard(
@@ -56,11 +110,11 @@ struct TrendsTabView: View {
         currentScore: ScoreResult?
     ) -> some View {
         let color = currentScore?.color ?? (data.isEmpty ? .secondary : scoreType.color(for: average(of: data)))
+        let delta = computeDelta(data: data)
 
         return VStack(alignment: .leading, spacing: 14) {
-            // Header with icon, title, current score badge
+            // Header
             HStack(spacing: 10) {
-                // Icon circle
                 Image(systemName: scoreType.systemImage)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(color)
@@ -72,19 +126,30 @@ struct TrendsTabView: View {
 
                 Spacer()
 
-                // Current score badge
-                if let currentScore {
-                    HStack(spacing: 4) {
+                // Current score + delta
+                HStack(spacing: 6) {
+                    if let currentScore {
                         Text(currentScore.formattedValue)
                             .font(.subheadline.weight(.bold).monospacedDigit())
                             .foregroundStyle(currentScore.color)
-                        Text(currentScore.label)
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(currentScore.color.opacity(0.8))
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(currentScore.color.opacity(0.1), in: Capsule())
+
+                    // Delta badge
+                    if let delta, abs(delta) > 1 {
+                        let isUp = delta > 0
+                        let deltaColor: Color = isUp ? .green : .orange
+
+                        HStack(spacing: 2) {
+                            Image(systemName: isUp ? "arrow.up.right" : "arrow.down.right")
+                                .font(.system(size: 7, weight: .bold))
+                            Text(String(format: "%+.0f", delta))
+                                .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                        }
+                        .foregroundStyle(deltaColor)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 3)
+                        .background(deltaColor.opacity(0.12), in: Capsule())
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -162,6 +227,14 @@ struct TrendsTabView: View {
     private func average(of data: [ScoreTimeSeriesPoint]) -> Double {
         guard !data.isEmpty else { return 0 }
         return data.map(\.value).reduce(0, +) / Double(data.count)
+    }
+
+    /// Difference between latest value and period average
+    private func computeDelta(data: [ScoreTimeSeriesPoint]) -> Double? {
+        guard data.count >= 2, let latest = data.last else { return nil }
+        let avg = average(of: data)
+        guard avg > 0 else { return nil }
+        return latest.value - avg
     }
 
     private func loadTrends() async {
